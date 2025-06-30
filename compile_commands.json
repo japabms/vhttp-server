@@ -1,0 +1,202 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "main.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/main.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "vtcp_socket.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/vtcp_socket.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "vthread_pool.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/vthread_pool.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "vstring.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/vstring.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "varray.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/varray.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "vhash_table.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/vhash_table.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "http_request.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/http_request.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "vmime_type.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/vmime_type.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "vfile.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/vfile.c"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wshadow",
+      "-Wconversion",
+      "-Wdouble-promotion",
+      "-Wnull-dereference",
+      "-fno-common",
+      "-ggdb",
+      "-O0",
+      "-fsanitize=undefined",
+      "-c",
+      "vepoll.c"
+    ],
+    "directory": "/home/victor/Workspace/vruntime",
+    "file": "/home/victor/Workspace/vruntime/vepoll.c"
+  }
+]

@@ -1,0 +1,12 @@
+.idea
+.cache
+.projectile
+
+build/
+thinkering/
+
+todo.md
+notes.md
+
+vstring_test
+compiler_commands.json
