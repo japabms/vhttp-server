@@ -1,5 +1,6 @@
 #include "vhash_table.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -39,12 +40,12 @@ vhash_table* VHashTable_Init(u64 Capacity) {
 }
 
 void VHashTable_Free(vhash_table *Table) {
-  for(s32 Idx = 0; Idx < Table->Count; Idx++) {
+  for(s32 Idx = 0; Idx < Table->Capacity; Idx++) {
     if(Table->Items[Idx].Key != NULL) {
       free(Table->Items[Idx].Key);
-      if(Table->Items[Idx].Value != NULL) {
-        free(Table->Items[Idx].Value);
-      }
+    }
+    if(Table->Items[Idx].Value != NULL) {
+      free(Table->Items[Idx].Value);
     }
   }
   
@@ -74,7 +75,7 @@ static void VHashTable_Rehash(vhash_table* Table) {
   Table->Count = 0;
   Table->Items = calloc(Table->Capacity, sizeof(vhash_item));
 
-  for(int i = 0; i < OldCapacity; i++) {
+  for(s32 i = 0; i < OldCapacity; i++) {
     vhash_item Item = OldItems[i];
     
     u64 NewIndex = Item.Hash % Table->Capacity;
@@ -85,41 +86,43 @@ static void VHashTable_Rehash(vhash_table* Table) {
 
     Table->Items[NewIndex] = Item;
   }
+  
   free(OldItems);
 }
 
 bool VHashTable_Insert(vhash_table* Table, vhash_key* Key, vhash_value* Value, u64 SizeofValue) {
   if(Table->Count >= Table->Capacity) {
-    // TODO(victor): Rehash
     VHashTable_Rehash(Table);
   }
-  vhash_item Item;
+  
+  vhash_item Item = {0};
   
   vhash_value* NewValue = calloc(1, SizeofValue);
   memcpy(NewValue, Value, SizeofValue);
   
-  Item.Key = (uchar*) strdup(Key);
+  Item.Key = (uchar*) strdup((char*) Key);
   Item.Value = NewValue;
-
-  u64 Hash = VHashTable_Hash(Key);
-  Item.Hash = Hash;
+  Item.Hash = VHashTable_Hash(Item.Key);
   
-  u64 Index = Hash % Table->Capacity;
-  while(!VHashTable_ItemIsEmpty(Table, Index)) {
-    if(strcmp(Table->Items[Index].Key, Key) == 0) {
+  u64 Idx = Item.Hash % Table->Capacity;
+  while(!VHashTable_ItemIsEmpty(Table, Idx)) {
+    if(strcmp(Table->Items[Idx].Key, Item.Key) == 0) {
       // Replacing the value if already exist
       free(Item.Key);
-      free(Table->Items[Index].Value);
+      free(Table->Items[Idx].Value);
       
-      Table->Items[Index].Value = Value;
+      Table->Items[Idx].Value = Item.Value;
       return true;
     } else {
       // Linear Probing
-      Index = (Index+1) % Table->Capacity;      
+      Idx = (Idx+1) % Table->Capacity;      
     }
   }
+  
+  Table->Items[Idx].Hash = Item.Hash;
+  Table->Items[Idx].Key = Item.Key;
+  Table->Items[Idx].Value = Item.Value;
 
-  Table->Items[Index] = Item;
   Table->Count += 1;
   return true;
 }
