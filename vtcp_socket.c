@@ -14,9 +14,9 @@
 #include <unistd.h>
 #include <errno.h>
 
-void SetSocketNonBlocking(s32* FileDescriptor) {
-  s32 Opts = fcntl(*FileDescriptor, F_GETFL, 0);
-  fcntl(*FileDescriptor, F_SETFL, Opts | O_NONBLOCK);
+void SetSocketNonBlocking(s32 FileDescriptor) {
+  s32 Opts = fcntl(FileDescriptor, F_GETFL, 0);
+  fcntl(FileDescriptor, F_SETFL, Opts | O_NONBLOCK);
 }
 
 void SetSocketRecvTimeout(s32* FileDescriptor, u64 Secs, u64 MicroSecs) {
@@ -137,7 +137,7 @@ tcp_server* CreateTcpServer(const char* IpAddress, u16 Port, const u32 MaxConnec
     exit(EXIT_FAILURE);
   }
 
-  SetSocketNonBlocking(&Server->Socket);
+  SetSocketNonBlocking(Server->FileDescriptor);
 
   memset(&Server->Socket, 0, sizeof(Server->Socket));
 

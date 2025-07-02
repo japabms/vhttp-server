@@ -17,6 +17,7 @@ struct tcp_server {
 };
 
 struct tcp_connection {
+  u64 Id;
   void* Data; 
 
   struct sockaddr_in Socket;
@@ -40,7 +41,7 @@ s64 Recv(s32 Socket, void* Buffer, u64 Length, s32 Flags);
 
 s64 Send(s32 Socket, void* Buffer, u64 Length, s32 Flags);
 
-void SetSocketNonBlocking(s32* FileDescriptor);
+void SetSocketNonBlocking(s32 FileDescriptor);
 void SetSocketRecvTimeout(s32* FileDescriptor, u64 Secs, u64 MicroSecs);
 void SetSocketKeepAlive(s32* FileDescriptor, s32 IdleSecs, s32 IntervalSecs, s32 Count);
 
