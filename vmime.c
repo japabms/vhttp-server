@@ -1,4 +1,4 @@
-#include "vmime_type.h"
+#include "vmime.h"
 #include <string.h>
 
 mime_mapping GetMimeType(const char *Extension) {
