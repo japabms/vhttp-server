@@ -3,7 +3,7 @@
 
 #include "vhash_table.h"
 #include "vstring.h"
-#include "vmime_type.h"
+#include "vmime.h"
 #include <stdbool.h>
 
 typedef enum vhttp_method {

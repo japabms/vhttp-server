@@ -22,7 +22,7 @@
 #include "vtcp_socket.h"
 #include "vthread_pool.h"
 #include "http_request.h"
-#include "vmime_type.h"
+#include "vmime.h"
 #include "vstring.h"
 #include "vfile.h"
 #include "vepoll.h"
@@ -45,6 +45,13 @@ static const char G_ForbiddenResponseFmt[] =
 
 static const char G_NotFoundResponseFmt[] =
   "HTTP/1.1 404 NOT FOUND\r\n"
+  "Server: vserve\r\n"
+  "Content-Length: 0\r\n"
+  "Content-Type: %s\r\n"
+  "Connection: close\r\n\r\n";
+
+static const char G_BadRequestResponseFmt[] =
+  "HTTP/1.1 400 BAD REQUEST\r\n"
   "Server: vserve\r\n"
   "Content-Length: 0\r\n"
   "Content-Type: %s\r\n"
@@ -101,7 +108,6 @@ void* ThreadSendfile(void* Args) {
              SendfileArgs.File.FileDescriptor,
              &Sended,
              SendfileArgs.File.Info.st_size - Sended);
-
     
     if(Ret == -1) {
       int err = errno;
@@ -126,10 +132,11 @@ void EpollHttpWorker(vepoll* Epoll, vthread_pool* TPool, s32 FileDescriptor, tcp
   vstring* StringPool = VString_InitWithCapacity(NULL, 4092); // NOTE: Memory allocation
   vhttp_request Request = {0};
   s64 Ret;
+  s32 Tries = 0;
 
-  // TODO: Check for erros;
   VHttpRequest_Init(&Request); // NOTE: Memory allocation
   
+  // TODO: Check for erros;  
   for(;;) {
     // NOTE: DO a MSG_PEEK, prepare the request, if the request has a high
     // content length, do another recv.
@@ -171,15 +178,30 @@ void EpollHttpWorker(vepoll* Epoll, vthread_pool* TPool, s32 FileDescriptor, tcp
         }
       }
 
-      VHttpRequest_Parse(&Request, StringPool);
+      bool ParseOk = VHttpRequest_Parse(&Request, StringPool);
+      if(!ParseOk) {
+        s32 Size = snprintf(ResponseMalloced, RESPONSE_MAX_LEN, G_BadRequestResponseFmt, "text/plain");
+        send(Conn->FileDescriptor, ResponseMalloced, Size, MSG_NOSIGNAL);
+        memset(ResponseMalloced, 0, Size);
+        goto cleanup;
+      }
+      
       // NOTE: if have a body, get it with RECV
-      // Check for Expect: 100-continue
+      // TODO: Check for Expect: 100-continue
       if(Request.ContentLength != 0) {
         VString_Resize(Request.Body, Request.ContentLength + 1);
         // FIXME: Do a loop to guarantee the retrieve of the body
         recv(FileDescriptor, Request.Body, Request.ContentLength, 0);
       }
     } else {
+      // TODO: make this better?
+      Tries += 1;
+        if(Tries == 5) {
+          s32 Size = snprintf(ResponseMalloced, RESPONSE_MAX_LEN, G_BadRequestResponseFmt, "text/plain");
+          send(Conn->FileDescriptor, ResponseMalloced, Size, MSG_NOSIGNAL);
+          memset(ResponseMalloced, 0, Size);
+          goto cleanup;          
+        }
       // TODO: Do realloc and call recv again.
     }
   }
@@ -190,7 +212,7 @@ void EpollHttpWorker(vepoll* Epoll, vthread_pool* TPool, s32 FileDescriptor, tcp
     
   memset(StringPool->Data, 0, StringPool->Length); StringPool->Length = 0;
   
-  vstring* FilePath = VString_Init(NULL);
+  vstring* FilePath = VString_Init(NULL); // NOTE: Memory allocation
   VString_ConcatCString(FilePath, AppRoot);
   VString_Concat(FilePath, Request.Url);
   
@@ -250,9 +272,6 @@ void EpollHttpWorker(vepoll* Epoll, vthread_pool* TPool, s32 FileDescriptor, tcp
       s32 err = errno;
       if (err == EAGAIN || err == EWOULDBLOCK) {
         break;
-      } else if (err == EPIPE) {
-        perror("send EPIPE");
-        goto cleanup;
       } else {
         perror("send error");
         goto cleanup;
@@ -290,7 +309,6 @@ void EpollHttpWorker(vepoll* Epoll, vthread_pool* TPool, s32 FileDescriptor, tcp
          : LastResponseLength);
   
   LastResponseLength = ResponseLen;
- 
   VString_Free(StringPool);
   VString_Free(FilePath);
   VHttpRequest_Destroy(&Request);
@@ -298,26 +316,16 @@ void EpollHttpWorker(vepoll* Epoll, vthread_pool* TPool, s32 FileDescriptor, tcp
 
   // Remove this goto later;
  cleanup:
+  printf("[INFO]: cleanup\n");
   Conn->Closed = 1;
+  close(Conn->Closed);
   VString_Free(StringPool);
   VHttpRequest_Destroy(&Request);
   return;
 }
 
-void log_connections(tcp_connection* c, int waiting) {
-  if(waiting) {
-    printf("WAITING CONNS\n");
-  } else {
-    printf("NORMAL CONNS\n");
-  }
-  for(int i = 0;  i < VArray_Count(c); i++) {
-    tcp_connection* cc = &c[i];
-    printf("fd:%d\nclosed:%d\nr&w: %d% d\n", cc->FileDescriptor, cc->Closed, cc->Readable, cc->Writable);
-  }
-}
-
-void debug_log_connection(tcp_connection *c) {
-  printf("tcp_connection { fd:%d closed:%d r&w: %d% d }\n", c->FileDescriptor, c->Closed, c->Readable, c->Writable);
+void DEBUG_LogConnection(tcp_connection *c) {
+  printf("tcp_connection { id: %lu fd:%d closed:%d r&w: %d% d }\n", c->Id, c->FileDescriptor, c->Closed, c->Readable, c->Writable);
 }
 
 int main(void) {
@@ -327,44 +335,47 @@ int main(void) {
   
   tcp_server* TcpServer = CreateTcpServer("0.0.0.0",
                                           8080,
-                                          10,
-                                          10);
+                                          SOMAXCONN,
+                                          10); // TODO: remove 'WaitingConnections' from this function.
   TcpListen(TcpServer);
   
   vepoll* Epoll =   VEpoll_Create();
+  
   VEpoll_AddFd(Epoll,
                EPOLLIN,
                TcpServer->FileDescriptor, 9999);
   
   // default epoll loop founded on epoll man page.
   while(true) {
-
     // TODO: Create VEpoll_Wait
     Epoll->EventsRecieved = epoll_wait(Epoll->FileDescriptor,
                                        Epoll->Events,
                                        MAX_EPOLL_EVENTS,
                                        -1);
 
-    fprintf(stdout, "[INFO]: Events recieved: %ld\n", Epoll->EventsRecieved);
+    // fprintf(stdout, "[INFO]: Events recieved: %ld\n", Epoll->EventsRecieved);
     if(Epoll->EventsRecieved == -1) {
       perror("epoll_wait");
       exit(EXIT_FAILURE);
     }
     
     for(int Idx = 0; Idx < Epoll->EventsRecieved; Idx++) {
-      u32 event_type = Epoll->Events[Idx].events;
+      u32 EventType = Epoll->Events[Idx].events;
       u64 EpollIdx = Epoll->Events[Idx].data.u64;
       tcp_connection* Conn = &TcpServer->Connections[EpollIdx];
-      // Event ready to be readed.
 
-      if(event_type & (EPOLLHUP|EPOLLRDHUP)) {
-        Conn->Closed = 1;
-        printf("[INFO]: Connection closed [%ld]:%d\n", EpollIdx, Conn->FileDescriptor);
+      // NOTE: Cleaning closed connections.
+      if(EventType & (EPOLLHUP|EPOLLRDHUP)) {
+        fprintf(stdout, "[INFO]: Connection closed [%lu/%ld]:%d\n", Conn->Id, EpollIdx, Conn->FileDescriptor);
+        if(!Conn->Closed) {
+          Conn->Closed = 1;
+          VEpoll_RemoveFd(Epoll, Conn->FileDescriptor);
+          close(Conn->FileDescriptor); 
+        }
       }
-      
-      if(event_type & EPOLLIN) {
-        // when TcpServer is ready.
 
+      if(EventType & EPOLLIN) {
+        // NOTE: Server recieved a in event.
         if(Epoll->Events[Idx].data.u64 == 9999) {
           tcp_connection Client = {0};
 
@@ -375,13 +386,14 @@ int main(void) {
                                          (struct sockaddr*) &Client.Socket,
                                          &Client.Length);
           if(Client.FileDescriptor == -1) {
-            perror("accept");
+            perror("[ERROR]: accept");
+            continue; 
           }
           
           Client.Server = TcpServer;
 
           // SetSocketRecvTimeout(&Client.FileDescriptor, 0, 500);
-          SetSocketNonBlocking(&Client.FileDescriptor);
+          SetSocketNonBlocking(Client.FileDescriptor);
           SetSocketKeepAlive(&Client.FileDescriptor,
                              30,
                              5,
@@ -389,40 +401,65 @@ int main(void) {
 
           u64 ConnCount = VArray_Count(TcpServer->Connections);
           u64 ConnCapacity = VArray_Capacity(TcpServer->Connections);
-          
+
+          // FIXME: THAT SHIT IS CONVOLUTED AS FUCK. SIMPLIFY THIS SHIT.          
           if(!(ConnCount == ConnCapacity)) {
             // NOTE: Add to epoll first, to VArray_Count return the correct idx.
             u64 NewConnIdx = VArray_Count(TcpServer->Connections);
-            fprintf(stdout, "[INFO]: Setting up new connection: [%d]:%d\n", NewConnIdx, Client.FileDescriptor);
-            VEpoll_AddFd(Epoll,
-                         EPOLLIN | EPOLLET | EPOLLOUT | EPOLLRDHUP,
-                         Client.FileDescriptor,
-                         NewConnIdx);
+            // fprintf(stdout, "[INFO]: Setting up new connection: [%d]:%d\n", NewConnIdx, Client.FileDescriptor);
+            Client.Id = NewConnIdx;
+
+            s32 FoundReusable = 0;
+            for(int i = 0; i < ConnCount; i++) {
+              tcp_connection* Conn2 = &TcpServer->Connections[i];
+              if(Conn2->Closed) {
+                // fprintf(stdout, "[INFO]: Reusing connection %lu\n", Conn2->Id);
+                Client.Id = Conn2->Id;
+                memcpy(Conn2, &Client, sizeof(Client));
+                VEpoll_AddFd(Epoll,
+                             EPOLLIN | EPOLLET | EPOLLOUT | EPOLLRDHUP,
+                             Client.FileDescriptor,
+                             Conn2->Id);
+                FoundReusable = 1;
+                break;
+              }
+            }
             // NOTE: Adding new connection
-            VArray_Push(TcpServer->Connections, Client);            
+            if(!FoundReusable) {
+              VEpoll_AddFd(Epoll,
+                           EPOLLIN | EPOLLET | EPOLLOUT | EPOLLRDHUP,
+                           Client.FileDescriptor,
+                           NewConnIdx);
+              VArray_Push(TcpServer->Connections, Client);
+            }
+            
           } else {
             // NOTE: Reusing connection
             int Found = 0;
             for(u32 i = 0; i < ConnCapacity; i++) {
               tcp_connection* Conn2 = &TcpServer->Connections[i];
-              if(Conn2->Closed) {
-                VEpoll_RemoveFd(Epoll, Conn2->FileDescriptor);
-                close(Conn2->FileDescriptor);
-
+              if(Conn2->Closed && Conn2->Closed) {
+                // fprintf(stdout, "[INFO]: Reusing connection %lu\n", Conn2->Id);
                 memcpy(Conn2, &Client, sizeof(Client));
                 VEpoll_AddFd(Epoll,
                              EPOLLIN | EPOLLET | EPOLLOUT | EPOLLRDHUP,
                              Conn2->FileDescriptor,
-                             i);
+                             Conn2->Id);
                 Found = 1;
                 break;
               }
             }
-            
+
+            // NOTE: This only handles the case when the user limited connections ocurr.
+            // TODO: Handle the case that the OS cant open fd's anymore.
             if(!Found) {
               printf("[INFO]: There is no closed connection available\n");
-              // NOTE: Connection unvailable.
-              send(Client.FileDescriptor, G_ServiceUnavailableResponseFmt, sizeof(G_ServiceUnavailableResponseFmt), MSG_NOSIGNAL);
+              // NOTE: Sending HTTP 503 service unvailable if there is no avaliable connection.
+              send(Client.FileDescriptor,
+                   G_ServiceUnavailableResponseFmt,
+                   sizeof(G_ServiceUnavailableResponseFmt),
+                   MSG_NOSIGNAL);
+              
               close(Client.FileDescriptor);
             }
           }
@@ -442,7 +479,7 @@ int main(void) {
       }
 
       // NOTE: Event ready to write.
-      if(event_type & EPOLLOUT) {
+      if(EventType & EPOLLOUT) {
         Conn->Writable = 1;
       }
     }
@@ -459,8 +496,7 @@ void ProcessEvents(vepoll *Epoll, vthread_pool *TPool, tcp_server* Server) {
   
   for(u32 Idx = 0; Idx < ConnectionsCount; Idx++) {
     tcp_connection* Conn = &Server->Connections[Idx];
-    debug_log_connection(Conn);
-            
+    // debug_log_connection(Conn);
     if(Conn->Closed) {
       continue;
     }

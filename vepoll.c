@@ -30,8 +30,9 @@ s32 VEpoll_AddFd(vepoll* Epoll, u32 Options, s32 FileDescriptor, u64 Idx) {
 s32 VEpoll_RemoveFd(vepoll* Epoll, s32 FileDescriptor) {
   if(epoll_ctl(Epoll->FileDescriptor, EPOLL_CTL_DEL, FileDescriptor, NULL) == - 1) {
     s32 err = errno;
-    fprintf(stderr, "[ERRNO %d] ", err);
+    fprintf(stderr, "[ERRNO %d %d]", FileDescriptor, err);
     perror("epoll_ctl_del");
+
   }
 
   return 0;
